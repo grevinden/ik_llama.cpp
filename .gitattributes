@@ -12,6 +12,8 @@
 #   git checkout upstream/main -- <file>
 # =============================================================================
 
+SKILL.md merge=ours
+
 # ─── Build script (наш кастомный) ───────────────────────────────────────────
 scripts/build-oneapi-cuda-deb.sh merge=ours
 
