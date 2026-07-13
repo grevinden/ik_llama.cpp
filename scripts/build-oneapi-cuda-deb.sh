@@ -270,13 +270,20 @@ build_deb() {
 
     # ─── Бинарники ────────────────────────────────────────────────────────
     local bin_dir="${BUILD_DIR}/bin"
-    local bins_to_package=("llama-server" "llama-cli" "llama-bench" "llama-quantize")
+    local bins_to_package=()
+    for bin_path in "${bin_dir}"/llama-*; do
+        [[ -f "$bin_path" ]] || continue
+        local bin_name
+        bin_name="$(basename "$bin_path")"
+        # skip symlinks and wrapper scripts
+        [[ -L "$bin_path" ]] && continue
+        bins_to_package+=("$bin_name")
+    done
 
+    info "Найдено бинарников для пакета: ${#bins_to_package[@]}"
     for bin in "${bins_to_package[@]}"; do
-        if [[ -f "${bin_dir}/${bin}" ]]; then
-            cp "${bin_dir}/${bin}" "$pkg_dir/usr/bin/"
-            chmod 755 "$pkg_dir/usr/bin/${bin}"
-        fi
+        cp "${bin_dir}/${bin}" "$pkg_dir/usr/bin/"
+        chmod 755 "$pkg_dir/usr/bin/${bin}"
     done
 
     # ─── Shared libraries ─────────────────────────────────────────────────
@@ -311,14 +318,14 @@ build_deb() {
     done
 
     # ─── Wrapper-скрипты с LD_LIBRARY_PATH ───────────────────────────────
-    for bin in "${bins_to_package[@]}"; do
-        local bin_path="$pkg_dir/usr/bin/${bin}"
+    for bin_name in "${bins_to_package[@]}"; do
+        local bin_path="$pkg_dir/usr/bin/${bin_name}"
         if [[ -f "$bin_path" ]]; then
             mv "$bin_path" "${bin_path}.bin"
             cat > "$bin_path" << WRAPPER
 #!/bin/bash
 export LD_LIBRARY_PATH="/usr/lib/ik-llama:\${LD_LIBRARY_PATH:-}"
-exec /usr/bin/${bin}.bin "\$@"
+exec /usr/bin/${bin_name}.bin "\$@"
 WRAPPER
             chmod 755 "$bin_path"
         fi
@@ -402,6 +409,53 @@ POSTRM
     echo "  llama-cli --version"
 }
 
+cleanup_old_deb() {
+    local pkg_name="ik-llama-cuda"
+    local old_debs
+    old_debs="$(find "$PROJECT_DIR" -maxdepth 1 -name "${pkg_name}_*_amd64.deb" 2>/dev/null)"
+    if [[ -n "$old_debs" ]]; then
+        info "Удаляю старые пакеты:"
+        echo "$old_debs" | while read -r f; do
+            echo "  $(basename "$f")"
+            rm -f "$f"
+        done
+    fi
+}
+
+cleanup_build_dir() {
+    info "Удаляю build-директорию: ${BUILD_DIR}"
+    rm -rf "$BUILD_DIR"
+    ok "Build-директория удалена"
+}
+
+cleanup_old_builds() {
+    info "Удаляю старые build-директории..."
+    local count=0
+    for d in "${PROJECT_DIR}"/build*; do
+        [[ -d "$d" ]] || continue
+        [[ "$d" == "${PROJECT_DIR}/${BUILD_DIR}" ]] && continue
+        rm -rf "$d"
+        ok "  удалена $(basename "$d")"
+        ((count++))
+    done
+    if [[ $count -eq 0 ]]; then
+        info "  старых build-директорий нет"
+    fi
+}
+
+tag_build() {
+    local version
+    version="$(get_version)"
+    cd "$PROJECT_DIR"
+
+    if git rev-parse "$version" &>/dev/null; then
+        warn "Тег ${version} уже существует, пропускаю"
+    else
+        git tag -a "$version" -m "deb: ${version}" 2>/dev/null
+        ok "Создан тег: ${version}"
+    fi
+}
+
 main() {
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
@@ -413,10 +467,14 @@ main() {
     setup_oneapi
     check_deps
     print_versions
+    cleanup_old_deb
+    cleanup_old_builds
     cmake_configure
     cmake_build
     verify_binaries
     build_deb
+    tag_build
+    cleanup_build_dir
 
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
