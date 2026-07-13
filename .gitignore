@@ -162,3 +162,5 @@ a.out
 a.out.*
 .dev
 .github
+
+*.deb

@@ -1,0 +1,19 @@
+# =============================================================================
+# .gitattributes — merge priority for ik-llama.cpp local changes
+#
+# При merge из upstream (ikawrakow/ik_llama.cpp) эти файлы сохраняют
+# нашу версию. Используется атрибут merge=ours — при конфликте git
+# автоматически берёт нашу (локальную) версию.
+#
+# Использование:
+#   git merge upstream/main   # наши изменения сохраняются автоматически
+#
+# Если нужно принять версию из upstream:
+#   git checkout upstream/main -- <file>
+# =============================================================================
+
+# ─── Build script (наш кастомный) ───────────────────────────────────────────
+scripts/build-oneapi-cuda-deb.sh merge=ours
+
+# ─── .gitignore (мы добавили *.deb, *.so, build*, и т.д.) ──────────────────
+.gitignore merge=ours
