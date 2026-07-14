@@ -137,6 +137,8 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    gpt_params_dump_to_log(params);
+
     common_speculative_prepare_startup(params);
 
     common_params_sampling & sparams = params.sparams;

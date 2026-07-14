@@ -611,6 +611,8 @@ void gpt_params_print_usage(int argc, char ** argv, const gpt_params & params);
 
 std::string gpt_params_get_system_info(const gpt_params & params);
 
+void gpt_params_dump_to_log(const gpt_params & params);
+
 
 struct common_remote_params {
     std::vector<std::string> headers;

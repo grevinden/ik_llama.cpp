@@ -3216,9 +3216,9 @@ void gpt_params_print_usage(int /*argc*/, char ** argv, const gpt_params & param
     options.push_back({ "*",           "-ictk, --indexer-cache-type-k TYPE", "indexer K-cache data type (default: %s)", params.indexer_cache_type_k.c_str() });
     options.push_back({ "*",           "-ctv,  --cache-type-v TYPE",    "KV cache data type for V (default: %s)", params.cache_type_v.c_str() });
     options.push_back({ "*",           "-ctk-first, --cache-type-k-first TYPE,N", "KV cache data type for the first N layers of K (default: %s,-1)", params.type_k_first.c_str() });
-    options.push_back({ "*",           "-ctv-last,  --cache-type-k-last  TYPE,N", "KV cache data type for the last N layers of K  (default: %s,-1)", params.type_k_last.c_str() });
+    options.push_back({ "*",           "-ctv-last,  --cache-type-v-last  TYPE,N", "KV cache data type for the last N layers of V  (default: %s,-1)", params.type_v_last.c_str() });
     options.push_back({ "*",           "-ctv-first, --cache-type-v-first TYPE,N", "KV cache data type for the first N layers of V (default: %s,-1)", params.type_v_first.c_str() });
-    options.push_back({ "*",           "-ctk-last,  --cache-type-v-last  TYPE,N", "KV cache data type for the last N layers of V  (default: %s,-1)", params.type_v_last.c_str() });
+    options.push_back({ "*",           "-ctk-last,  --cache-type-k-last  TYPE,N", "KV cache data type for the last N layers of K  (default: %s,-1)", params.type_k_last.c_str() });
     options.push_back({ "*",           "-mtprot, --mtp-requantize-output-tensor type", "Use output requantized to type for MTP (default: %s)", params.extra_output_type.c_str() });
     options.push_back({ "*",           "-ctkd, --cache-type-k-draft TYPE", "KV cache data type for K for the draft model" });
     options.push_back({ "*",           "-ctvd, --cache-type-v-draft TYPE", "KV cache data type for V for the draft model" });
@@ -3472,6 +3472,356 @@ std::string gpt_params_get_system_info(const gpt_params & params) {
     os << " / " << std::thread::hardware_concurrency() << " | " << llama_print_system_info();
 
     return os.str();
+}
+
+void gpt_params_dump_to_log(const gpt_params & params) {
+    LOG_INF("==================================================");
+    LOG_INF("========== ALL APPLICATION PARAMETERS ==========");
+    LOG_INF("==================================================");
+
+    // General parameters
+    LOG_INF("devices: %s", params.devices.c_str());
+    LOG_INF("seed: %u", params.seed);
+    LOG_INF("verbosity: %d", params.verbosity);
+    LOG_INF("minilog: %s", params.minilog ? "true" : "false");
+
+    // Threading parameters
+    LOG_INF("n_threads: %d", params.n_threads);
+    LOG_INF("n_threads_batch: %d", params.n_threads_batch);
+    LOG_INF("n_threads_mtmd: %d", params.n_threads_mtmd);
+    LOG_INF("numa: %d", (int)params.numa);
+
+    // Context and batch parameters
+    LOG_INF("n_predict: %d", params.n_predict);
+    LOG_INF("n_ctx: %d", params.n_ctx);
+    LOG_INF("n_batch: %d", params.n_batch);
+    LOG_INF("n_ubatch: %d", params.n_ubatch);
+    LOG_INF("n_keep: %d", params.n_keep);
+    LOG_INF("n_chunks: %d", params.n_chunks);
+    LOG_INF("n_parallel: %d", params.n_parallel);
+    LOG_INF("n_sequences: %d", params.n_sequences);
+
+    // GPU parameters
+    LOG_INF("n_gpu_layers: %d", params.n_gpu_layers);
+    LOG_INF("main_gpu: %d", params.main_gpu);
+    LOG_INF("max_gpu: %d", params.max_gpu);
+    LOG_INF("ncmoe: %d", params.ncmoe);
+    LOG_INF("fit_margin: %d", params.fit_margin);
+    LOG_INF("fit: %s", params.fit ? "true" : "false");
+    LOG_INF("worst_graph_tokens: %d", params.worst_graph_tokens);
+    LOG_INF("split_mode: %d", (int)params.split_mode);
+    for (int i = 0; i < 128 && params.tensor_split[i] > 0; i++) {
+        LOG_INF("tensor_split[%d]: %f", i, params.tensor_split[i]);
+    }
+
+    // Group attention parameters
+    LOG_INF("grp_attn_n: %d", params.grp_attn_n);
+    LOG_INF("grp_attn_w: %d", params.grp_attn_w);
+
+    // Print parameters
+    LOG_INF("n_print: %d", params.n_print);
+
+    // RoPE parameters
+    LOG_INF("rope_freq_base: %f", (double)params.rope_freq_base);
+    LOG_INF("rope_freq_scale: %f", (double)params.rope_freq_scale);
+    LOG_INF("rope_scaling_type: %d", (int)params.rope_scaling_type);
+    LOG_INF("yarn_ext_factor: %f", (double)params.yarn_ext_factor);
+    LOG_INF("yarn_attn_factor: %f", (double)params.yarn_attn_factor);
+    LOG_INF("yarn_beta_fast: %f", (double)params.yarn_beta_fast);
+    LOG_INF("yarn_beta_slow: %f", (double)params.yarn_beta_slow);
+    LOG_INF("yarn_orig_ctx: %d", params.yarn_orig_ctx);
+
+    // KV cache parameters
+    LOG_INF("defrag_thold: %f", (double)params.defrag_thold);
+    LOG_INF("ban_phrases_bias: %f", (double)params.ban_phrases_bias);
+    LOG_INF("max_extra_alloc_MiB: %d", params.max_extra_alloc_MiB);
+    LOG_INF("nrep: %d", params.nrep);
+    LOG_INF("cache_type_k: %s", params.cache_type_k.c_str());
+    LOG_INF("cache_type_v: %s", params.cache_type_v.c_str());
+    LOG_INF("indexer_cache_type_k: %s", params.indexer_cache_type_k.c_str());
+    LOG_INF("reduce_type: %s", params.reduce_type.c_str());
+    LOG_INF("graph_attn_precision: %s", params.graph_attn_precision.c_str());
+    LOG_INF("type_k_first: %s", params.type_k_first.c_str());
+    LOG_INF("type_k_last: %s", params.type_k_last.c_str());
+    LOG_INF("type_v_first: %s", params.type_v_first.c_str());
+    LOG_INF("type_v_last: %s", params.type_v_last.c_str());
+    LOG_INF("n_k_first: %d", params.n_k_first);
+    LOG_INF("n_k_last: %d", params.n_k_last);
+    LOG_INF("n_v_first: %d", params.n_v_first);
+    LOG_INF("n_v_last: %d", params.n_v_last);
+
+    // Pooling and attention type
+    LOG_INF("pooling_type: %d", (int)params.pooling_type);
+    LOG_INF("attention_type: %d", (int)params.attention_type);
+
+    // Speculative decoding parameters
+    LOG_INF("speculative.type: %d", (int)params.speculative.type);
+    LOG_INF("speculative.n_threads: %d", params.speculative.n_threads);
+    LOG_INF("speculative.n_threads_batch: %d", params.speculative.n_threads_batch);
+    LOG_INF("speculative.n_max: %d", params.speculative.n_max);
+    LOG_INF("speculative.n_min: %d", params.speculative.n_min);
+    LOG_INF("speculative.p_min: %f", (double)params.speculative.p_min);
+    LOG_INF("speculative.mtp_heads: %d", params.speculative.mtp_heads);
+    LOG_INF("speculative.dflash_cross_ctx: %d", params.speculative.dflash_cross_ctx);
+    LOG_INF("speculative.p_split: %f", (double)params.speculative.p_split);
+    LOG_INF("speculative.ngram_size_n: %u", params.speculative.ngram_size_n);
+    LOG_INF("speculative.ngram_size_m: %u", params.speculative.ngram_size_m);
+    LOG_INF("speculative.ngram_min_hits: %u", params.speculative.ngram_min_hits);
+    LOG_INF("speculative.suffix_min_match_len: %d", params.speculative.suffix_min_match_len);
+    LOG_INF("speculative.suffix_max_depth: %d", params.speculative.suffix_max_depth);
+    LOG_INF("speculative.suffix_corpus: %s", params.speculative.suffix_corpus.c_str());
+    LOG_INF("speculative.lookup_cache_static: %s", params.speculative.lookup_cache_static.c_str());
+    LOG_INF("speculative.lookup_cache_dynamic: %s", params.speculative.lookup_cache_dynamic.c_str());
+    LOG_INF("speculative.model: %s", params.speculative.model.c_str());
+    LOG_INF("speculative.recurrent_ckpt_mode: %d", params.speculative.recurrent_ckpt_mode);
+    LOG_INF("speculative.devices: %s", params.speculative.devices.c_str());
+    LOG_INF("speculative.params: %s", params.speculative.params.c_str());
+
+    // Model parameters
+    LOG_INF("model: %s", params.model.c_str());
+    LOG_INF("model_alias: %s", params.model_alias.c_str());
+    LOG_INF("model_url: %s", params.model_url.c_str());
+    LOG_INF("hf_token: %s", params.hf_token.c_str());
+    LOG_INF("hf_repo: %s", params.hf_repo.c_str());
+    LOG_INF("hf_file: %s", params.hf_file.c_str());
+    LOG_INF("prompt: %s", params.prompt.c_str());
+    LOG_INF("prompt_file: %s", params.prompt_file.c_str());
+    LOG_INF("prompt_is_binary: %s", params.prompt_is_binary ? "true" : "false");
+    LOG_INF("path_prompt_cache: %s", params.path_prompt_cache.c_str());
+    LOG_INF("input_prefix: %s", params.input_prefix.c_str());
+    LOG_INF("input_suffix: %s", params.input_suffix.c_str());
+    LOG_INF("logdir: %s", params.logdir.c_str());
+    LOG_INF("lookup_cache_static: %s", params.lookup_cache_static.c_str());
+    LOG_INF("lookup_cache_dynamic: %s", params.lookup_cache_dynamic.c_str());
+    LOG_INF("logits_file: %s", params.logits_file.c_str());
+    LOG_INF("rpc_servers: %s", params.rpc_servers.c_str());
+    LOG_INF("cuda_params: %s", params.cuda_params.c_str());
+
+    // In files and antiprompt
+    LOG_INF("in_files count: %zu", params.in_files.size());
+    LOG_INF("antiprompt count: %zu", params.antiprompt.size());
+    LOG_INF("ban_phrases count: %zu", params.ban_phrases.size());
+    LOG_INF("banned_n: %d", params.banned_n);
+    LOG_INF("n_buffer: %zu", params.n_buffer);
+    LOG_INF("can_ban_phrases: %s", params.can_ban_phrases ? "true" : "false");
+
+    // Allow rules
+    LOG_INF("allow_ruless count: %zu", params.allow_ruless.size());
+    LOG_INF("allow_pieces count: %zu", params.allow_pieces.size());
+    LOG_INF("allow_kws count: %zu", params.allow_kws.size());
+    LOG_INF("allow_kw_delay: %zu", params.allow_kw_delay);
+
+    // Overrides and policies
+    LOG_INF("kv_overrides count: %zu", params.kv_overrides.size());
+    LOG_INF("tensor_buft_overrides count: %zu", params.tensor_buft_overrides.size());
+    LOG_INF("offload_policy count: %zu", params.offload_policy.size());
+    LOG_INF("fit_margin_array count: %zu", params.fit_margin_array.size());
+    LOG_INF("lora_init_without_apply: %s", params.lora_init_without_apply ? "true" : "false");
+    LOG_INF("lora_adapters count: %zu", params.lora_adapters.size());
+    LOG_INF("control_vectors count: %zu", params.control_vectors.size());
+
+    // Control vector parameters
+    LOG_INF("control_vector_layer_start: %d", params.control_vector_layer_start);
+    LOG_INF("control_vector_layer_end: %d", params.control_vector_layer_end);
+
+    // PPL parameters
+    LOG_INF("ppl_stride: %d", params.ppl_stride);
+    LOG_INF("ppl_output_type: %d", params.ppl_output_type);
+
+    // Evaluation tasks
+    LOG_INF("hellaswag: %s", params.hellaswag ? "true" : "false");
+    LOG_INF("hellaswag_tasks: %zu", params.hellaswag_tasks);
+    LOG_INF("winogrande: %s", params.winogrande ? "true" : "false");
+    LOG_INF("winogrande_tasks: %zu", params.winogrande_tasks);
+    LOG_INF("multiple_choice: %s", params.multiple_choice ? "true" : "false");
+    LOG_INF("multiple_choice_tasks: %zu", params.multiple_choice_tasks);
+    LOG_INF("kl_divergence: %s", params.kl_divergence ? "true" : "false");
+
+    // Usage and display flags
+    LOG_INF("usage: %s", params.usage ? "true" : "false");
+    LOG_INF("use_color: %s", params.use_color ? "true" : "false");
+    LOG_INF("special: %s", params.special ? "true" : "false");
+
+    // Interactive and conversation flags
+    LOG_INF("interactive: %s", params.interactive ? "true" : "false");
+    LOG_INF("interactive_first: %s", params.interactive_first ? "true" : "false");
+    LOG_INF("conversation: %s", params.conversation ? "true" : "false");
+    LOG_INF("prompt_cache_all: %s", params.prompt_cache_all ? "true" : "false");
+    LOG_INF("prompt_cache_ro: %s", params.prompt_cache_ro ? "true" : "false");
+    LOG_INF("ctx_shift: %s", params.ctx_shift ? "true" : "false");
+    LOG_INF("escape: %s", params.escape ? "true" : "false");
+    LOG_INF("multiline_input: %s", params.multiline_input ? "true" : "false");
+    LOG_INF("simple_io: %s", params.simple_io ? "true" : "false");
+
+    // Batch and attention flags
+    LOG_INF("cont_batching: %s", params.cont_batching ? "true" : "false");
+    LOG_INF("flash_attn: %s", params.flash_attn ? "true" : "false");
+    LOG_INF("mla_attn: %d", params.mla_attn);
+    LOG_INF("attn_max_batch: %d", params.attn_max_batch);
+    LOG_INF("fused_moe_up_gate: %s", params.fused_moe_up_gate ? "true" : "false");
+    LOG_INF("fused_up_gate: %s", params.fused_up_gate ? "true" : "false");
+    LOG_INF("fused_mmad: %s", params.fused_mmad ? "true" : "false");
+    LOG_INF("grouped_expert_routing: %s", params.grouped_expert_routing ? "true" : "false");
+    LOG_INF("rope_cache: %s", params.rope_cache ? "true" : "false");
+    LOG_INF("graph_reuse: %s", params.graph_reuse ? "true" : "false");
+    LOG_INF("dsa: %s", params.dsa ? "true" : "false");
+    LOG_INF("fused_idx_topk: %s", params.fused_idx_topk ? "true" : "false");
+    LOG_INF("dsa_top_k: %d", params.dsa_top_k);
+    LOG_INF("min_experts: %d", params.min_experts);
+    LOG_INF("thresh_experts: %f", (double)params.thresh_experts);
+
+    // Prompt and generation flags
+    LOG_INF("input_prefix_bos: %s", params.input_prefix_bos ? "true" : "false");
+    LOG_INF("ignore_eos: %s", params.ignore_eos ? "true" : "false");
+    LOG_INF("logits_all: %s", params.logits_all ? "true" : "false");
+    LOG_INF("use_mmap: %s", params.use_mmap ? "true" : "false");
+    LOG_INF("use_mlock: %s", params.use_mlock ? "true" : "false");
+    LOG_INF("verbose_prompt: %s", params.verbose_prompt ? "true" : "false");
+    LOG_INF("display_prompt: %s", params.display_prompt ? "true" : "false");
+    LOG_INF("infill: %s", params.infill ? "true" : "false");
+    LOG_INF("dump_kv_cache: %s", params.dump_kv_cache ? "true" : "false");
+    LOG_INF("no_kv_offload: %s", params.no_kv_offload ? "true" : "false");
+    LOG_INF("warmup: %s", params.warmup ? "true" : "false");
+    LOG_INF("batch_warmup: %s", params.batch_warmup ? "true" : "false");
+
+    // Tensor and quantization flags
+    LOG_INF("check_tensors: %s", params.check_tensors ? "true" : "false");
+    LOG_INF("repack_tensors: %s", params.repack_tensors ? "true" : "false");
+    LOG_INF("use_thp: %s", params.use_thp ? "true" : "false");
+    LOG_INF("validate_quants: %s", params.validate_quants ? "true" : "false");
+    LOG_INF("only_active_exps: %s", params.only_active_exps ? "true" : "false");
+    LOG_INF("merge_qkv: %s", params.merge_qkv ? "true" : "false");
+    LOG_INF("merge_up_gate_exps: %s", params.merge_up_gate_exps ? "true" : "false");
+    LOG_INF("defer_experts: %s", params.defer_experts ? "true" : "false");
+    LOG_INF("prefetch_experts: %s", params.prefetch_experts ? "true" : "false");
+    LOG_INF("prefetch_experts_threads: %d", params.prefetch_experts_threads);
+    LOG_INF("k_cache_hadamard: %s", params.k_cache_hadamard ? "true" : "false");
+    LOG_INF("v_cache_hadamard: %s", params.v_cache_hadamard ? "true" : "false");
+    LOG_INF("split_mode_graph_scheduling: %s", params.split_mode_graph_scheduling ? "true" : "false");
+    LOG_INF("scheduler_async: %s", params.scheduler_async ? "true" : "false");
+    LOG_INF("fused_delta_net: %d", params.fused_delta_net);
+    LOG_INF("has_mtp: %s", params.has_mtp ? "true" : "false");
+
+    // Extra output type
+    LOG_INF("extra_output_type: %s", params.extra_output_type.c_str());
+
+    // MMProj and multimodal parameters
+    LOG_INF("mmproj.path: %s", params.mmproj.path.c_str());
+    LOG_INF("mmproj.url: %s", params.mmproj.url.c_str());
+    LOG_INF("mmproj.hf_repo: %s", params.mmproj.hf_repo.c_str());
+    LOG_INF("mmproj.hf_file: %s", params.mmproj.hf_file.c_str());
+    LOG_INF("mmproj.docker_repo: %s", params.mmproj.docker_repo.c_str());
+    LOG_INF("mmproj_use_gpu: %s", params.mmproj_use_gpu ? "true" : "false");
+    LOG_INF("no_mmproj: %s", params.no_mmproj ? "true" : "false");
+    LOG_INF("image count: %zu", params.image.size());
+    LOG_INF("image_min_tokens: %d", params.image_min_tokens);
+    LOG_INF("image_max_tokens: %d", params.image_max_tokens);
+    LOG_INF("mtmd_kq_type: %s", params.mtmd_kq_type.c_str());
+
+    // Embedding parameters
+    LOG_INF("embedding: %s", params.embedding ? "true" : "false");
+    LOG_INF("embd_normalize: %d", params.embd_normalize);
+    LOG_INF("embd_out: %s", params.embd_out.c_str());
+    LOG_INF("embd_sep: %s", params.embd_sep.c_str());
+
+    // Server parameters
+    LOG_INF("port: %d", params.port);
+    LOG_INF("timeout_read: %d", params.timeout_read);
+    LOG_INF("timeout_write: %d", params.timeout_write);
+    LOG_INF("n_threads_http: %d", params.n_threads_http);
+    LOG_INF("send_done: %s", params.send_done ? "true" : "false");
+    LOG_INF("hostname: %s", params.hostname.c_str());
+    LOG_INF("public_path: %s", params.public_path.c_str());
+
+    // Template and reasoning parameters
+    LOG_INF("chat_template: %s", params.chat_template.c_str());
+    LOG_INF("use_jinja: %s", params.use_jinja ? "true" : "false");
+    LOG_INF("use_peg: %s", params.use_peg ? "true" : "false");
+    LOG_INF("system_prompt: %s", params.system_prompt.c_str());
+    LOG_INF("enable_chat_template: %s", params.enable_chat_template ? "true" : "false");
+    LOG_INF("force_pure_content_parser: %s", params.force_pure_content_parser ? "true" : "false");
+    LOG_INF("parallel_tool_calls: %s", params.parallel_tool_calls ? "true" : "false");
+    LOG_INF("reasoning_format: %d", (int)params.reasoning_format);
+    LOG_INF("enable_reasoning: %d", params.enable_reasoning);
+    LOG_INF("reasoning_budget: %d", params.reasoning_budget);
+    LOG_INF("reasoning_budget_message: %s", params.reasoning_budget_message.c_str());
+    LOG_INF("default_template_kwargs count: %zu", params.default_template_kwargs.size());
+    LOG_INF("think_tokens.exclude: %s", params.think_tokens.exclude ? "true" : "false");
+    LOG_INF("think_tokens.begin: %s", params.think_tokens.begin.c_str());
+    LOG_INF("think_tokens.end: %s", params.think_tokens.end.c_str());
+    LOG_INF("prefill_assistant: %s", params.prefill_assistant ? "true" : "false");
+    LOG_INF("dry_run: %s", params.dry_run ? "true" : "false");
+
+    // API and SSL parameters
+    LOG_INF("api_keys count: %zu", params.api_keys.size());
+    LOG_INF("ssl_file_key: %s", params.ssl_file_key.c_str());
+    LOG_INF("ssl_file_cert: %s", params.ssl_file_cert.c_str());
+
+    // WebUI and endpoint parameters
+    LOG_INF("webui: %d", (int)params.webui);
+    LOG_INF("webui_mcp_proxy: %s", params.webui_mcp_proxy ? "true" : "false");
+    LOG_INF("endpoint_slots: %s", params.endpoint_slots ? "true" : "false");
+    LOG_INF("endpoint_props: %s", params.endpoint_props ? "true" : "false");
+    LOG_INF("endpoint_metrics: %s", params.endpoint_metrics ? "true" : "false");
+    LOG_INF("log_json: %s", params.log_json ? "true" : "false");
+    LOG_INF("slot_save_path: %s", params.slot_save_path.c_str());
+    LOG_INF("sql_save_file: %s", params.sql_save_file.c_str());
+    LOG_INF("sqlite_zstd_ext_file: %s", params.sqlite_zstd_ext_file.c_str());
+    LOG_INF("slot_prompt_similarity: %f", (double)params.slot_prompt_similarity);
+
+    // Checkpoint parameters
+    LOG_INF("do_checkpoint: %s", params.do_checkpoint ? "true" : "false");
+    LOG_INF("ctx_checkpoints_n: %d", params.ctx_checkpoints_n);
+    LOG_INF("ctx_checkpoints_interval: %d", params.ctx_checkpoints_interval);
+    LOG_INF("ctx_checkpoints_tolerance: %d", params.ctx_checkpoints_tolerance);
+    LOG_INF("ctx_checkpoint_eviction: %d", (int)params.ctx_checkpoint_eviction);
+    LOG_INF("cache_ram_mib: %d", params.cache_ram_mib);
+    LOG_INF("cache_ram_n_min: %d", params.cache_ram_n_min);
+    LOG_INF("cache_ram_similarity: %f", (double)params.cache_ram_similarity);
+
+    // Batched-bench parameters
+    LOG_INF("is_pp_shared: %s", params.is_pp_shared ? "true" : "false");
+    LOG_INF("n_pp count: %zu", params.n_pp.size());
+    LOG_INF("n_tg count: %zu", params.n_tg.size());
+    LOG_INF("n_pl count: %zu", params.n_pl.size());
+
+    // Retrieval parameters
+    LOG_INF("context_files count: %zu", params.context_files.size());
+    LOG_INF("chunk_size: %d", params.chunk_size);
+    LOG_INF("chunk_separator: %s", params.chunk_separator.c_str());
+
+    // Passkey parameters
+    LOG_INF("n_junk: %d", params.n_junk);
+    LOG_INF("i_pos: %d", params.i_pos);
+
+    // Imatrix parameters
+    LOG_INF("out_file: %s", params.out_file.c_str());
+    LOG_INF("out_file_draft: %s", params.out_file_draft.c_str());
+    LOG_INF("output_tensor_name: %s", params.output_tensor_name.c_str());
+    LOG_INF("n_out_freq: %d", params.n_out_freq);
+    LOG_INF("n_save_freq: %d", params.n_save_freq);
+    LOG_INF("i_chunk: %d", params.i_chunk);
+    LOG_INF("process_output: %s", params.process_output ? "true" : "false");
+    LOG_INF("compute_ppl: %s", params.compute_ppl ? "true" : "false");
+
+    // Cvector-generator parameters
+    LOG_INF("n_pca_batch: %d", params.n_pca_batch);
+    LOG_INF("n_pca_iterations: %d", params.n_pca_iterations);
+    LOG_INF("cvector_dimre_method: %d", (int)params.cvector_dimre_method);
+    LOG_INF("cvector_outfile: %s", params.cvector_outfile.c_str());
+    LOG_INF("cvector_positive_file: %s", params.cvector_positive_file.c_str());
+    LOG_INF("cvector_negative_file: %s", params.cvector_negative_file.c_str());
+
+    // LoRA export parameters
+    LOG_INF("spm_infill: %s", params.spm_infill ? "true" : "false");
+    LOG_INF("lora_outfile: %s", params.lora_outfile.c_str());
+
+    // Bench parameters
+    LOG_INF("sweep_bench_output_jsonl: %s", params.sweep_bench_output_jsonl ? "true" : "false");
+
+    LOG_INF("==================================================");
+    LOG_INF("========= END OF APPLICATION PARAMETERS =========");
+    LOG_INF("==================================================");
 }
 
 //
